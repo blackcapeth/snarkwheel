@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNARKWHEEL — spin, answer, verify</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0d0a1a;
+    color: #f0eefa;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+  body { display: flex; align-items: center; justify-content: center; padding: 22px 14px; }
+  .wrap { width: 100%; max-width: 440px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  h1 {
+    font-size: 22px; font-weight: 800; margin: 0; letter-spacing: 0.5px;
+    background: linear-gradient(90deg,#4dd8c4,#a78bfa,#f472b6,#facc4d);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stat { text-align: right; }
+  .stat .label { font-size: 10px; color: #9089b0; text-transform: uppercase; letter-spacing: 1px; }
+  .stat .value { font-size: 20px; font-weight: 800; color: #4dd8c4; line-height: 1; }
+  .subtitle { font-size: 12.5px; color: #b3aed0; margin: 0 0 18px 0; line-height: 1.5; }
+
+  .console { background: #14112400; border-radius: 18px; }
+
+  .card {
+    background: #16132a;
+    border: 1px solid #2a2450;
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .wheel-zone { display: flex; flex-direction: column; align-items: center; }
+  .wheel-outer { position: relative; width: 260px; height: 260px; margin-bottom: 18px; }
+  .pointer {
+    position: absolute; top: -4px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 20px solid #f472b6;
+    z-index: 4;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  }
+  .wheel {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    position: relative;
+    border: 5px solid #2a2450;
+    transition: transform 3.4s cubic-bezier(0.12, 0.72, 0.15, 1);
+    background: conic-gradient(from -90deg,
+      #4dd8c4 0deg 45deg,
+      #a78bfa 45deg 90deg,
+      #f472b6 90deg 135deg,
+      #facc4d 135deg 180deg,
+      #4da3f4 180deg 225deg,
+      #a8e05a 225deg 270deg,
+      #ff9142 270deg 315deg,
+      #ff5f7e 315deg 360deg
+    );
+  }
+  .wheel-label {
+    position: absolute; top: 50%; left: 50%;
+    width: 60px; margin-left: -30px;
+    text-align: center;
+    font-size: 13px; font-weight: 800; color: #0d0a1a;
+    transform-origin: top center;
+  }
+  .hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 46px; height: 46px; border-radius: 50%;
+    background: #16132a; border: 3px solid #2a2450;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; z-index: 3;
+  }
+
+  .btn {
+    padding: 13px 24px;
+    background: linear-gradient(90deg,#4dd8c4,#a78bfa);
+    border: none; color: #0d0a1a; font-family: inherit;
+    font-size: 14px; font-weight: 800; letter-spacing: 0.3px;
+    border-radius: 10px; cursor: pointer;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn.ghost { background: transparent; border: 1px solid #3a355e; color: #f0eefa; }
+
+  .qhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .qpoints {
+    font-size: 12px; font-weight: 800; color: #0d0a1a;
+    background: #facc4d; padding: 4px 10px; border-radius: 20px;
+  }
+  .qtimerbar { height: 5px; background: #221d3f; border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
+  .qtimerbar-fill { height: 100%; background: linear-gradient(90deg,#4dd8c4,#f472b6); width: 100%; transform-origin: left; }
+  .qtext { font-size: 15px; font-weight: 700; line-height: 1.5; margin: 0 0 16px 0; }
+  .options { display: flex; flex-direction: column; gap: 9px; }
+  .opt {
+    padding: 12px 14px;
+    background: #1e1a38;
+    border: 1px solid #322c5c;
+    border-radius: 10px;
+    font-size: 13.5px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .opt:hover { border-color: #6a5fc4; }
+  .opt.correct { background: #123a34; border-color: #4dd8c4; color: #7ff0e0; }
+  .opt.wrong { background: #3a1a28; border-color: #ff5f7e; color: #ffb3c2; }
+  .opt.disabled { pointer-events: none; opacity: 0.85; }
+
+  .lede { font-size: 13.5px; color: #cfc9ea; line-height: 1.7; margin: 0 0 16px 0; text-align: center; }
+  .lede b { color: #f0eefa; }
+  .rank { font-size: 28px; font-weight: 800; margin: 4px 0 2px 0; text-align: center;
+    background: linear-gradient(90deg,#4dd8c4,#a78bfa,#f472b6);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .rankmeta { font-size: 12.5px; color: #9089b0; text-align: center; margin-bottom: 18px; }
+
+  .center-col { display: flex; flex-direction: column; align-items: center; }
+  .hidden { display: none; }
+  .footer { margin-top: 16px; font-size: 11px; color: #6b6490; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>SNARKWHEEL</h1>
+    <div class="stat"><div class="label">round</div><div class="value" id="roundVal">0 / 6</div></div>
+  </div>
+  <p class="subtitle">spin for points, answer about the project, keep what you earn &middot; 6 rounds</p>
+
+  <div class="card">
+
+    <div id="screen-intro" class="center-col">
+      <p class="lede">Spin the wheel to see how many points a question is worth,<br>
+      then answer it about <b>zkSNARKs</b>, the manifesto, the SNARKLIST and the Zilk Road.<br>
+      Get it right, keep the points. 6 rounds, then your rank.</p>
+      <button class="btn" id="startBtn">start</button>
+    </div>
+
+    <div id="screen-spin" class="wheel-zone hidden">
+      <div class="wheel-outer">
+        <div class="pointer"></div>
+        <div class="wheel" id="wheel"></div>
+        <div class="hub">🔐</div>
+      </div>
+      <button class="btn" id="spinBtn">spin</button>
+    </div>
+
+    <div id="screen-question" class="hidden">
+      <div class="qhead">
+        <span id="qroundLabel" style="font-size:12px;color:#9089b0;"></span>
+        <span class="qpoints" id="qpointsLabel"></span>
+      </div>
+      <div class="qtimerbar"><div class="qtimerbar-fill" id="qtimerFill"></div></div>
+      <p class="qtext" id="qtext"></p>
+      <div class="options" id="options"></div>
+    </div>
+
+    <div id="screen-end" class="center-col hidden">
+      <div class="rank" id="tierLabel"></div>
+      <div class="rankmeta" id="scoreMeta"></div>
+      <div class="rankmeta" id="localRankMeta" style="margin-bottom:18px;"></div>
+      <button class="btn" id="retryBtn">spin again</button>
+    </div>
+
+  </div>
+  <div class="footer">fan project, unaffiliated with any protocol team</div>
+</div>
+
+<script>
+(function(){
+  var SEGMENTS = [30, 60, 100, 150, 200, 250, 300, 500];
+  var SEG_COUNT = SEGMENTS.length;
+  var SEG_ANGLE = 360 / SEG_COUNT;
+  var TOTAL_ROUNDS = 6;
+  var Q_TIME_MS = 12000;
+  var STORAGE_KEY = 'snarkwheel_scores_v1';
+
+  var QUESTIONS = [
+    {q:"Who wrote \"A Cypherpunk's Manifesto\"?", o:["Eric Hughes","Satoshi Nakamoto","Vitalik Buterin","Zooko Wilcox"], a:0},
+    {q:"In what year was the Cypherpunk's Manifesto written?", o:["1987","1993","2001","2009"], a:1},
+    {q:"What does the \"zk\" in zk-SNARK stand for?", o:["zoned key","zero-knowledge","zeta kernel","zig-zag"], a:1},
+    {q:"SNARK is usually short for:", o:["Succinct Non-interactive Argument of Knowledge","Standard Node Authentication Record","Secure Network Access Registry","Shielded Node Address Reference"], a:0},
+    {q:"Zcash's ticker symbol is:", o:["ZEC","ZKC","ZCH","ZSH"], a:0},
+    {q:"A zero-knowledge proof lets you prove something is true without:", o:["a computer","revealing the underlying data","a blockchain","an internet connection"], a:1},
+    {q:"In Zcash, transactions that hide sender, receiver, and amount are called:", o:["public transactions","shielded transactions","broadcast transactions","open transactions"], a:1},
+    {q:"According to the manifesto, privacy is not the same as:", o:["cryptography","secrecy","cash","code"], a:1},
+    {q:"According to the manifesto, who has to write the software that defends privacy?", o:["governments","corporations","cypherpunks themselves","banks"], a:2},
+    {q:"The manifesto argues that laws against cryptography are limited by:", o:["a nation's border","the price of ZEC","internet speed","exchange rates"], a:0},
+    {q:"Which of these is an example of an old-world privacy tool mentioned in the manifesto?", o:["a VPN","a closed door","a firewall","a hardware wallet"], a:1},
+    {q:"What blockchain does the zkSNARKs collection settle its identities on?", o:["Ethereum","Zcash","Solana","Bitcoin"], a:1},
+    {q:"\"Selective disclosure\" in zero-knowledge systems means:", o:["revealing everything to everyone","revealing only what's needed, nothing more","hiding everything forever","publishing all data publicly"], a:1},
+    {q:"The Cypherpunk's Manifesto famously ends with the word:", o:["\"Goodbye.\"","\"Onward.\"","\"Forever.\"","\"Encrypted.\""], a:1},
+    {q:"What best describes cash, according to the manifesto, historically?", o:["the primary anonymous transaction system","a form of surveillance","a shielded transaction","a smart contract"], a:0},
+    {q:"What is the official website of the zkSNARKs project?", o:["zksnarks.io","zksnarks.net","snarklist.com","zeccollection.xyz"], a:1},
+    {q:"What is the project's official X/Twitter handle?", o:["@zksnarks_","@zk_snark_official","@zcashsnarks","@snarksdao"], a:0},
+    {q:"How does the project describe its collection?", o:["a collection of trading cards","a collection of encrypted identities stored on Zcash","a collection of stablecoins","a set of governance tokens"], a:1},
+    {q:"What naming convention is used for individual collection pieces?", o:["IDENTITY_#","LUMINARY_0XX","GHOST_XX","NODE_0X"], a:1},
+    {q:"What is the project's whitelist system called?", o:["ALLOWLIST","SNARKLIST","VERIFYLIST","ZECLIST"], a:1},
+    {q:"On a recent SNARKLIST status update, how many identities had been verified out of 1,000?", o:["253","547","812","1,000"], a:1},
+    {q:"In that same update, how many spots remained unverified?", o:["453","547","100","0"], a:0},
+    {q:"What was the listed \"state\" of the SNARKLIST in that update?", o:["closed","reviewing","paused","cancelled"], a:1},
+    {q:"Where can users check their own SNARKLIST status?", o:["zksnarks.net/status","zilkroad.com/status","zcash.org/status","snarklist.io"], a:0},
+    {q:"Even after applications closed, how could someone still join the SNARKLIST?", o:["pay a fee","be nominated by an existing member","tweet 100 times","mine ZEC"], a:1},
+    {q:"Which account can be followed specifically for SNARKLIST updates?", o:["@snarklist","@zecupdates","@zksnarks_news","@auroraisnear"], a:0},
+    {q:"The project's promotional footage uses which visual style to make the case for privacy?", o:["cartoon animation","surveillance / CCTV-style footage","hand-drawn sketches","stock photography"], a:1},
+    {q:"What is the name of the project's road-themed campaign?", o:["Silk Route","Zilk Road","Ghost Trail","Shield Path"], a:1},
+    {q:"What is the official website for that road-themed campaign?", o:["zilkroad.com","roadofzec.com","snarkroad.net","zilkway.io"], a:0},
+    {q:"What recurring phrase is used to promote that campaign?", o:["join_the_snarklist_","follow_the_zilk_road_","mint_the_road_","zec_the_way_"], a:1},
+    {q:"\"Zilk\" is a wordplay combining \"zero-knowledge\" with which historic route?", o:["the Silk Road","the Oregon Trail","the Amber Road","the Spice Route"], a:0},
+    {q:"The Zilk Road teaser videos are shown in what visual style?", o:["glitchy CRT / VHS-style","clean flat design","3D render","hand-painted"], a:0},
+    {q:"Along with zksnarks.net, which other site is listed as an official channel?", o:["zilkroad.com","zcash.org","near.org","aurora.dev"], a:0},
+    {q:"What currency is referenced throughout the Zilk Road posts?", o:["$ZEC","$BTC","$ETH","$SOL"], a:0},
+    {q:"Which two partners does zkSNARKs mention teaming up with for the mint?", o:["Aurora Intents and NEAR Intents","Uniswap and Chainlink","Solana and Polygon","Coinbase and Binance"], a:0},
+    {q:"What is the stated goal of that partnership?", o:["to raise the mint price","to make the launch as smooth as possible","to delay the mint","to remove the SNARKLIST"], a:1},
+    {q:"According to the announcement, from how many chains can users bid?", o:["only Ethereum","only Zcash","any chain","only Solana"], a:2},
+    {q:"Which assets were explicitly listed as acceptable for bidding?", o:["BTC, ETH, SOL, BNB, stablecoins","only NFTs","only ZEC","gold-backed tokens"], a:0},
+    {q:"Regardless of what asset is bid, what does everything ultimately settle in?", o:["ZEC","USDC","ETH","the bidder's original asset"], a:0},
+    {q:"In the bidding process, what is the first step?", o:["send funds immediately","enter your bid amount and max price in $ZEC","create a Zcash wallet","verify your identity publicly"], a:1},
+    {q:"What address must a bidder provide for delivery of the mint?", o:["an Ethereum address","a Zcash address","a Bitcoin address","an email address"], a:1},
+    {q:"What does the system generate for whichever chain you're paying from?", o:["a discount code","a deposit address","a new token","a private key"], a:1},
+    {q:"From where must a bidder send their funds?", o:["an exchange","their own wallet","a custodial account","a friend's wallet"], a:1},
+    {q:"Who \"routes\" the $ZEC according to the partnership announcement?", o:["Aurora Intents","the SNARKLIST","the user manually","a centralized exchange"], a:0},
+    {q:"What best describes the purpose of the LUMINARY portraits?", o:["random decoration","a visual representation of a verified encrypted identity","a leaderboard graphic","an error message"], a:1},
+    {q:"Why might a project like this settle everything in ZEC instead of the original bid asset?", o:["ZEC is the only coin that exists","to keep the final settlement shielded and private","because ZEC is the cheapest asset","it's required by law"], a:1},
+    {q:"What risk does the manifesto say people face without privacy tools?", o:["higher fees","being forced to reveal themselves in every transaction","slower internet","losing their keys"], a:1},
+    {q:"Which of these is NOT mentioned as a way to join the SNARKLIST?", o:["applying during the open window","being nominated by a member","buying a spot directly","waiting for a status update"], a:2},
+    {q:"What is the common thread connecting the manifesto, the SNARKLIST, and the Zilk Road?", o:["low transaction fees","privacy and selective disclosure of identity or value","fast block times","free giveaways"], a:1}
+  ];
+
+  var wheelEl = document.getElementById('wheel');
+  var currentRotation = 0;
+  var currentPoints = 0;
+  var round = 0;
+  var totalScore = 0;
+  var pool = [];
+  var currentQ = null;
+  var qTimerHandle = null;
+
+  function buildWheelLabels(){
+    for (var i = 0; i < SEG_COUNT; i++){
+      var label = document.createElement('div');
+      label.className = 'wheel-label';
+      label.textContent = SEGMENTS[i];
+      var centerAngle = i * SEG_ANGLE + SEG_ANGLE / 2;
+      label.style.transform = 'translate(-50%,-50%) rotate(' + centerAngle + 'deg) translateY(-92px)';
+      label.style.left = '50%';
+      label.style.top = '50%';
+      label.style.marginLeft = '0';
+      wheelEl.appendChild(label);
+    }
+  }
+  buildWheelLabels();
+
+  function shuffle(arr){
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function showScreen(id){
+    ['screen-intro','screen-spin','screen-question','screen-end'].forEach(function(s){
+      document.getElementById(s).classList.add('hidden');
+    });
+    document.getElementById(id).classList.remove('hidden');
+  }
+
+  document.getElementById('startBtn').addEventListener('click', function(){
+    round = 0;
+    totalScore = 0;
+    pool = shuffle(QUESTIONS).slice(0, TOTAL_ROUNDS);
+    nextRound();
+  });
+
+  document.getElementById('retryBtn').addEventListener('click', function(){
+    document.getElementById('startBtn').click();
+  });
+
+  function nextRound(){
+    round++;
+    document.getElementById('roundVal').textContent = round + ' / ' + TOTAL_ROUNDS;
+    showScreen('screen-spin');
+    document.getElementById('spinBtn').disabled = false;
+  }
+
+  document.getElementById('spinBtn').addEventListener('click', function(){
+    var btn = this;
+    btn.disabled = true;
+    var targetIndex = Math.floor(Math.random() * SEG_COUNT);
+    currentPoints = SEGMENTS[targetIndex];
+    var centerAngle = targetIndex * SEG_ANGLE + SEG_ANGLE / 2;
+    var currentMod = ((currentRotation % 360) + 360) % 360;
+    var neededMod = (360 - centerAngle) % 360;
+    var delta = (neededMod - currentMod + 360) % 360;
+    var spins = 5;
+    currentRotation += spins * 360 + delta;
+    wheelEl.style.transform = 'rotate(' + currentRotation + 'deg)';
+
+    setTimeout(function(){
+      showQuestion();
+    }, 3500);
+  });
+
+  function showQuestion(){
+    currentQ = pool[round - 1];
+    document.getElementById('qroundLabel').textContent = 'round ' + round + ' / ' + TOTAL_ROUNDS;
+    document.getElementById('qpointsLabel').textContent = currentPoints + ' pts';
+    document.getElementById('qtext').textContent = currentQ.q;
+
+    var optsEl = document.getElementById('options');
+    optsEl.innerHTML = '';
+    var order = shuffle(currentQ.o.map(function(text, idx){ return {text: text, idx: idx}; }));
+
+    order.forEach(function(item){
+      var div = document.createElement('div');
+      div.className = 'opt';
+      div.textContent = item.text;
+      div.addEventListener('click', function(){ handleAnswer(item.idx, div); });
+      optsEl.appendChild(div);
+    });
+
+    showScreen('screen-question');
+    runQTimer();
+  }
+
+  function runQTimer(){
+    var fill = document.getElementById('qtimerFill');
+    fill.style.transition = 'none';
+    fill.style.transform = 'scaleX(1)';
+    void fill.offsetWidth;
+    fill.style.transition = 'transform ' + Q_TIME_MS + 'ms linear';
+    fill.style.transform = 'scaleX(0)';
+    qTimerHandle = setTimeout(function(){
+      handleAnswer(-1, null);
+    }, Q_TIME_MS);
+  }
+
+  function handleAnswer(chosenIdx, el){
+    if (qTimerHandle){ clearTimeout(qTimerHandle); qTimerHandle = null; }
+    var opts = document.querySelectorAll('#options .opt');
+    opts.forEach(function(o){ o.classList.add('disabled'); });
+
+    var correct = chosenIdx === currentQ.a;
+    if (correct){
+      totalScore += currentPoints;
+      if (el) el.classList.add('correct');
+    } else {
+      if (el) el.classList.add('wrong');
+      opts.forEach(function(o, i){
+        // mark the correct one among displayed order by matching text
+      });
+      var correctText = currentQ.o[currentQ.a];
+      opts.forEach(function(o){
+        if (o.textContent === correctText) o.classList.add('correct');
+      });
+    }
+
+    setTimeout(function(){
+      if (round >= TOTAL_ROUNDS){
+        endGame();
+      } else {
+        nextRound();
+      }
+    }, 1300);
+  }
+
+  function getTier(score){
+    if (score >= 2201) return 'LUMINARY';
+    if (score >= 1501) return 'SNARKLIST MEMBER';
+    if (score >= 901) return 'VERIFIED SIGNAL';
+    if (score >= 401) return 'NODE OPERATOR';
+    return 'OBSERVER';
+  }
+
+  function endGame(){
+    var history = [];
+    try {
+      history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    } catch(e){ history = []; }
+    history.push(totalScore);
+    history.sort(function(a,b){ return b - a; });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(history)); } catch(e){}
+
+    var rank = history.indexOf(totalScore) + 1;
+    var totalRuns = history.length;
+    var best = history[0];
+
+    document.getElementById('tierLabel').textContent = getTier(totalScore);
+    document.getElementById('scoreMeta').textContent = totalScore + ' points across ' + TOTAL_ROUNDS + ' rounds';
+    document.getElementById('localRankMeta').textContent =
+      'rank #' + rank + ' of ' + totalRuns + ' run' + (totalRuns === 1 ? '' : 's') + ' on this device \u00b7 best: ' + best;
+
+    showScreen('screen-end');
+  }
+})();
+</script>
+</body>
+</html>
