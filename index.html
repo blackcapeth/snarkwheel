@@ -122,9 +122,62 @@
   .center-col { display: flex; flex-direction: column; align-items: center; }
   .hidden { display: none; }
   .footer { margin-top: 16px; font-size: 11px; color: #6b6490; text-align: center; }
+
+  /* ambient background blobs */
+  .blob {
+    position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.35;
+    pointer-events: none; z-index: 0; animation: floaty 14s ease-in-out infinite;
+  }
+  .blob1 { width: 280px; height: 280px; background: #4dd8c4; top: -80px; left: -80px; animation-delay: 0s; }
+  .blob2 { width: 240px; height: 240px; background: #f472b6; bottom: -70px; right: -60px; animation-delay: 3s; }
+  .blob3 { width: 200px; height: 200px; background: #a78bfa; top: 40%; right: -90px; animation-delay: 6s; }
+  @keyframes floaty {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    50% { transform: translate(20px,-24px) scale(1.12); }
+  }
+  .wrap { position: relative; z-index: 1; }
+
+  /* correct-answer celebration */
+  .confetti-piece {
+    position: fixed; top: -12px; width: 9px; height: 9px; z-index: 50;
+    pointer-events: none; opacity: 0.95;
+    animation: confetti-fall linear forwards;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(600deg); opacity: 0; }
+  }
+  .toast {
+    position: fixed; top: 18%; left: 50%; transform: translate(-50%,-20px) scale(0.7);
+    background: linear-gradient(90deg,#4dd8c4,#a78bfa);
+    color: #0d0a1a; font-weight: 800; font-size: 16px;
+    padding: 12px 22px; border-radius: 30px; z-index: 60;
+    box-shadow: 0 8px 30px rgba(77,216,196,0.45);
+    opacity: 0; pointer-events: none;
+    animation: toast-pop 1.1s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+  .toast.wrong-toast {
+    background: linear-gradient(90deg,#ff5f7e,#ff9142);
+    box-shadow: 0 8px 30px rgba(255,95,126,0.4);
+  }
+  @keyframes toast-pop {
+    0% { opacity: 0; transform: translate(-50%,-20px) scale(0.7); }
+    15% { opacity: 1; transform: translate(-50%,0) scale(1.08); }
+    25% { transform: translate(-50%,0) scale(1); }
+    80% { opacity: 1; transform: translate(-50%,0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%,-10px) scale(0.95); }
+  }
+  @keyframes pulse-correct {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(77,216,196,0.5); }
+    50% { box-shadow: 0 0 0 10px rgba(77,216,196,0); }
+  }
+  .opt.correct { animation: pulse-correct 0.9s ease-out 1; }
 </style>
 </head>
 <body>
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<div class="blob blob3"></div>
 <div class="wrap">
   <div class="topbar">
     <h1>SNARKWHEEL</h1>
@@ -229,7 +282,8 @@
     {q:"Why might a project like this settle everything in ZEC instead of the original bid asset?", o:["ZEC is the only coin that exists","to keep the final settlement shielded and private","because ZEC is the cheapest asset","it's required by law"], a:1},
     {q:"What risk does the manifesto say people face without privacy tools?", o:["higher fees","being forced to reveal themselves in every transaction","slower internet","losing their keys"], a:1},
     {q:"Which of these is NOT mentioned as a way to join the SNARKLIST?", o:["applying during the open window","being nominated by a member","buying a spot directly","waiting for a status update"], a:2},
-    {q:"What is the common thread connecting the manifesto, the SNARKLIST, and the Zilk Road?", o:["low transaction fees","privacy and selective disclosure of identity or value","fast block times","free giveaways"], a:1}
+    {q:"What is the common thread connecting the manifesto, the SNARKLIST, and the Zilk Road?", o:["low transaction fees","privacy and selective disclosure of identity or value","fast block times","free giveaways"], a:1},
+    {q:"What does \"succinct\" refer to in zk-SNARK?", o:["the proof is very small and fast to verify","the transaction fee is low","the code is short","the wallet is minimalist"], a:0}
   ];
 
   var wheelEl = document.getElementById('wheel');
@@ -342,6 +396,42 @@
     }, Q_TIME_MS);
   }
 
+  var CONFETTI_COLORS = ['#4dd8c4','#a78bfa','#f472b6','#facc4d','#4da3f4','#a8e05a','#ff9142'];
+
+  function fireConfetti(){
+    var count = 42;
+    for (var i = 0; i < count; i++){
+      (function(){
+        var piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        var color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+        piece.style.background = color;
+        piece.style.left = Math.random() * 100 + 'vw';
+        var isCircle = Math.random() > 0.5;
+        piece.style.borderRadius = isCircle ? '50%' : '2px';
+        var w = 6 + Math.random() * 7;
+        piece.style.width = w + 'px';
+        piece.style.height = (isCircle ? w : w * 1.6) + 'px';
+        var duration = 1600 + Math.random() * 1400;
+        piece.style.animationDuration = duration + 'ms';
+        piece.style.animationDelay = (Math.random() * 200) + 'ms';
+        document.body.appendChild(piece);
+        setTimeout(function(){ piece.remove(); }, duration + 400);
+      })();
+    }
+  }
+
+  function showToast(text, isWrong){
+    var toast = document.createElement('div');
+    toast.className = 'toast' + (isWrong ? ' wrong-toast' : '');
+    toast.textContent = text;
+    document.body.appendChild(toast);
+    setTimeout(function(){ toast.remove(); }, 1150);
+  }
+
+  var CORRECT_MESSAGES = ['🎉 Nice!', '⚡ Verified!', '🔐 Signal caught!', '✨ Correct!', '🚀 Sharp!'];
+  var WRONG_MESSAGES = ['👀 Not quite', '🌫️ Missed signal', '❌ Off by one'];
+
   function handleAnswer(chosenIdx, el){
     if (qTimerHandle){ clearTimeout(qTimerHandle); qTimerHandle = null; }
     var opts = document.querySelectorAll('#options .opt');
@@ -351,15 +441,15 @@
     if (correct){
       totalScore += currentPoints;
       if (el) el.classList.add('correct');
+      fireConfetti();
+      showToast(CORRECT_MESSAGES[Math.floor(Math.random() * CORRECT_MESSAGES.length)] + ' +' + currentPoints, false);
     } else {
       if (el) el.classList.add('wrong');
-      opts.forEach(function(o, i){
-        // mark the correct one among displayed order by matching text
-      });
       var correctText = currentQ.o[currentQ.a];
       opts.forEach(function(o){
         if (o.textContent === correctText) o.classList.add('correct');
       });
+      showToast(WRONG_MESSAGES[Math.floor(Math.random() * WRONG_MESSAGES.length)], true);
     }
 
     setTimeout(function(){
